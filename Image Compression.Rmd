@@ -1,0 +1,81 @@
+---
+title: "Image Compression using PCA"
+author: "Kshitij Karan"
+date: "2023-03-10"
+output: html_document
+---
+
+```{r}
+
+library(jpeg)
+
+## Reading the image
+img = readJPEG("tiger.jpeg")
+
+# Store each RGB color scheme matrix as a separate variable
+red <- img[,,1]
+green <- img[,,2]
+blue <- img[,,3]
+
+redpca <- prcomp(red, center = FALSE, scale = TRUE)
+bluepca <- prcomp(blue, center = FALSE, scale = TRUE)
+greenpca <- prcomp(green, center = FALSE, scale = TRUE)
+
+
+```
+
+
+```{r}
+
+## defining a set of principal components
+k_values <- list(3, 5, 10, 25, 50, 100, 150, 200, 250, 300, 350, nrow(img))
+
+rgb.pca <- list(redpca, greenpca, bluepca)
+
+
+## Compressing the image based on principal components
+for (i in k_values) {
+  pca.img <- sapply(rgb.pca, function(j) {
+    compressed.img <- j$x[,1:i] %*% t(j$rotation[,1:i])
+  }, simplify = 'array')
+  writeJPEG(pca.img, paste('compressed/compressed_', round(i,0), '_components.jpg', sep = ''))
+}
+
+
+original <- file.info('tiger.jpeg')$size / 1000
+imgs <- dir('compressed/')
+for (i in imgs) {
+  full.path <- paste('compressed/', i, sep='')
+  print(paste(i, ' size: ', file.info(full.path)$size / 1000, ' original: ', original, ' % diff: ', round((file.info(full.path)$size / 1000 - original) / original, 2) * 100, '%', sep = ''))
+}
+
+```
+
+```{r}
+
+variance <- c()
+compression_ratio <- c()
+
+for (i in k_values) {
+ pca.img <- sapply(rgb.pca, function(j) {
+ compressed.img <- j$x[,1:i] %*% t(j$rotation[,1:i])
+ }, simplify = 'array')
+ 
+ # calculate variance 
+ total_pixels <- prod(dim(img)[1:2])
+ mse <- mean((img - pca.img)^2)
+ variance_new <- 1 - mse/var(img)^2
+ variance <- c(variance, variance_new)
+ 
+ # calculate compression ratio
+ compressed_size <- file.size(paste('compressed
+_', round(i,0), '_components.jpg', sep = ''))
+ compression_ratio <- c(compression_ratio, (total_pixels*3)/compressed_size)
+}
+
+# plot of variance with k
+plot(k_values, variance, type='b', xlab='Number of principal components (k)', ylab='Variance', main='Variance vs Number of principal components (k)')
+
+
+
+```
